@@ -19,6 +19,7 @@ import scala.Tuple2;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -44,6 +45,7 @@ public class SimpleApp {
 //        String logFile = "D:\\spark\\src\\main\\java\\case.csv";
         String logFile = "/hadoop/case.csv"; // Should be some file on your system
         SparkConf sparkConf = new SparkConf().setAppName("Simple Application");
+//                .setMaster("local[*]").set("spark.testing.memory", "471859200");
         JavaSparkContext sc = new JavaSparkContext(sparkConf);
 
 //        SparkSession spark = SparkSession.builder()
@@ -52,13 +54,13 @@ public class SimpleApp {
 //                .appName("Simple Application").getOrCreate();
         List<List<Integer>> arrayLists = SimpleApp.loadDataSet(logFile);
         int node = arrayLists.get(0).size();
-        JavaRDD<Result>[] datasets = new JavaRDD[1];
+        final JavaRDD<Result>[] datasets = new JavaRDD[9];
         int rddindex=0;
-        for(int i=0;i<20;){
+        for(int i=0;i<90;){
             int num=0;
-            List<Tuple2<Integer,Matrix>> list = new ArrayList<>(20);
-            List<Integer> indexlist = new ArrayList<>(20);
-            while(num<20){
+            List<Tuple2<Integer,Matrix>> list = new ArrayList<>(10);
+            List<Integer> indexlist = new ArrayList<>(10);
+            while(num<10){
                 Matrix matrix = new Matrix();
                 matrix.setArrayLists(arrayLists);
                 matrix.setInteger(i);
@@ -67,7 +69,7 @@ public class SimpleApp {
                 i++;
                 num++;
             }
-            JavaPairRDD<Integer, Matrix> integerMatrixJavaPairRDD = sc.parallelizePairs(list, 20);
+            JavaPairRDD<Integer, Matrix> integerMatrixJavaPairRDD = sc.parallelizePairs(list, 10);
 //            Encoder<Matrix> encoder = Encoders.bean(Matrix.class);
 //            Encoder<Result> resultEncoder = Encoders.bean(Result.class);
 
@@ -91,7 +93,7 @@ public class SimpleApp {
             myPartitioner.setPartitions(indexlist.size());
             myPartitioner.initMap(myPartitioner.getPartitions(),indexlist);
 //            JavaRDD<Result> resultJavaRDD = pairRDD.partitionBy(myPartitioner).mapPartitions(new FlatMapFunction<Iterator<Tuple2<Integer, Matrix>>, Result>() {
-            JavaRDD<Result> resultJavaRDD = integerMatrixJavaPairRDD.partitionBy(myPartitioner).mapPartitions(new FlatMapFunction<Iterator<Tuple2<Integer, Matrix>>, Result>() {
+            final JavaRDD<Result> resultJavaRDD = integerMatrixJavaPairRDD.partitionBy(myPartitioner).mapPartitions(new FlatMapFunction<Iterator<Tuple2<Integer, Matrix>>, Result>() {
                 private int UPPER_BOUND = 2;
                 @Override
                 public Iterator<Result> call(Iterator<Tuple2<Integer, Matrix>> tuple2Iterator) throws Exception {
@@ -334,8 +336,9 @@ public class SimpleApp {
             e.printStackTrace();
         }
         PrintWriter pw = new PrintWriter(fw);
-        ConcurrentHashMap<String,List<Result>> concurrentHashMap = new ConcurrentHashMap<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        final ConcurrentHashMap<String,List<Result>> concurrentHashMap = new ConcurrentHashMap<>();
+        CountDownLatch countDownLatch = new CountDownLatch(9);
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
         for(int i=0;i<datasets.length;i++) {
             final int tem = i;
 //            if(datasets[i].collect()==null){
@@ -343,28 +346,35 @@ public class SimpleApp {
 //            }
 //            else {
 //
-                List<Result> results = datasets[i].collect();
-            System.out.println(results);
-                results.forEach(result -> {
-                    pw.println(result.getSon() + ": " + result.getParents());
-                    System.out.println("=============节点son: " + result.getSon() + ",fa: " + result.getParents());
-                });
+//                List<Result> results = datasets[i].collect();
+//            System.out.println(results);
+//                results.forEach(result -> {
+//                    pw.println(result.getSon() + ": " + result.getParents());
+//                    System.out.println("=============节点son: " + result.getSon() + ",fa: " + result.getParents());
+//                });
 //
 //            }
-//            executorService.execute(()->{
-//                List<Result> results = datasets[tem].collect();
-//                concurrentHashMap.put("RDD_"+tem,results);
-//                results.forEach(result -> {
-//                    System.out.println("节点son: " + result.getSon() + ",fa: " + result.getParents());
-//                });
-//            });
+            executorService.execute(()->{
+                List<Result> results = datasets[tem].collect();
+                concurrentHashMap.put("RDD_"+tem,results);
+                results.forEach(result -> {
+                    System.out.println("节点son: " + result.getSon() + ",fa: " + result.getParents());
+                });
+                countDownLatch.countDown();
+            });
         }
-//        concurrentHashMap.forEach((k,v)->{
-//            int size = v.size();
-//            for(int i=0;i<size;i++){
-//                pw.println(v.get(i).getSon() + ": " + v.get(i).getParents());
-//            }
-//        });
+        try {
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        executorService.shutdown();
+        concurrentHashMap.forEach((k,v)->{
+            int size = v.size();
+            for(int i=0;i<size;i++){
+                pw.println(v.get(i).getSon() + ": " + v.get(i).getParents());
+            }
+        });
         pw.flush();
         try {
             fw.flush();

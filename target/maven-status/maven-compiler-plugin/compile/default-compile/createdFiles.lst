@@ -1,4 +1,5 @@
 spark\SimpleApp.class
+spark\SingleBN.class
 spark\SimpleApp$1.class
 spark\BigIntegerArr.class
 spark\MyPartitioner.class
