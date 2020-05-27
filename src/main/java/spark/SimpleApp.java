@@ -54,13 +54,13 @@ public class SimpleApp {
 //                .appName("Simple Application").getOrCreate();
         List<List<Integer>> arrayLists = SimpleApp.loadDataSet(logFile);
         int node = arrayLists.get(0).size();
-        final JavaRDD<Result>[] datasets = new JavaRDD[9];
+        final JavaRDD<Result>[] datasets = new JavaRDD[56];
         int rddindex=0;
-        for(int i=0;i<90;){
+        for(int i=0;i<node;){
             int num=0;
-            List<Tuple2<Integer,Matrix>> list = new ArrayList<>(10);
-            List<Integer> indexlist = new ArrayList<>(10);
-            while(num<10){
+            List<Tuple2<Integer,Matrix>> list = new ArrayList<>(18);
+            List<Integer> indexlist = new ArrayList<>(18);
+            while(num<18&&i<node){
                 Matrix matrix = new Matrix();
                 matrix.setArrayLists(arrayLists);
                 matrix.setInteger(i);
@@ -69,7 +69,7 @@ public class SimpleApp {
                 i++;
                 num++;
             }
-            JavaPairRDD<Integer, Matrix> integerMatrixJavaPairRDD = sc.parallelizePairs(list, 10);
+            JavaPairRDD<Integer, Matrix> integerMatrixJavaPairRDD = sc.parallelizePairs(list, 18);
 //            Encoder<Matrix> encoder = Encoders.bean(Matrix.class);
 //            Encoder<Result> resultEncoder = Encoders.bean(Result.class);
 
@@ -337,7 +337,7 @@ public class SimpleApp {
         }
         PrintWriter pw = new PrintWriter(fw);
         final ConcurrentHashMap<String,List<Result>> concurrentHashMap = new ConcurrentHashMap<>();
-        CountDownLatch countDownLatch = new CountDownLatch(9);
+        CountDownLatch countDownLatch = new CountDownLatch(56);
         ExecutorService executorService = Executors.newFixedThreadPool(5);
         for(int i=0;i<datasets.length;i++) {
             final int tem = i;
